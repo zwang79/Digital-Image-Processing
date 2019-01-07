@@ -1,0 +1,72 @@
+% generate low pass filter h0 based on Kaiser window
+N    = 29;       
+Fc   = 0.5363563;      
+flag = 'scale';  
+Beta = 9;        
+win = kaiser(N+1, Beta); 
+h0  = fir1(N, Fc, 'low', win, flag);
+figure(1);
+freqz(h0);
+ 
+% generate h1
+n=rem(1:30,2);
+   m=1*(n>0.5)+(-1)*(n<=0.5); % times a 1,-1,1,-1... sequence
+h1=h0.*m;
+ 
+% intuitive plot of h0, h1, and amplitude distortion
+[H0,w]=freqz(h0,1,512);
+hmag0 = abs(H0);
+figure(2);
+subplot(2,2,1)
+plot(w,hmag0);
+title('Frequency Response of h0');
+ 
+[H1,w]=freqz(h1,1,512);
+hmag1 = abs(H1);
+subplot(2,2,2)
+plot(w,hmag1);
+title('Frequency Response of h1');
+ 
+subplot(2,2,[3 4])
+plot(w,(hmag0.^2+hmag1.^2))
+title('H0(w)^2+H1(w)^2');
+ 
+% Optimization factor Er
+one=ones(512,1);
+Er=sum((hmag0.^2+hmag1.^2-one).^2);
+Er;
+ 
+% Simulation
+% Generate input signal x(n)
+ntaps = 65;
+f = [0.0 0.9 0.95 1.0];
+mag = [ 1.0 1.0 0.7071 0.0];
+b = fir2(ntaps, f, mag);
+n1 = length(b);
+len1 = 256 - n1 + 1;
+data = 5*[zeros(1, 24) ones(1, 48) zeros(1, 48) -1*ones(1, 48) zeros(1,23)];
+x = conv(b, data);
+ 
+% x(n) go through QMF system 
+u0=conv(x,h0);
+v0=dyaddown(u0,1);
+w0=dyadup(v0,1);
+u1=conv(x,h1);
+v1=dyaddown(u1,1);
+w1=dyadup(v1,1);
+f0=h0;
+f1=-h1;
+xhat=conv(w0,f0)+conv(w1,f1);
+ 
+% Simulation results
+figure(3);
+subplot(3,1,1)
+stem(x);
+title('input signal x(n)');
+subplot(3,1,2)
+stem(xhat);
+title('output signal xhat(n)');
+error=abs(xhat(31:286).*2-x);
+subplot(3,1,3)
+stem(error);
+title('absolute error between x(n) and 2 times xhat(n)');
